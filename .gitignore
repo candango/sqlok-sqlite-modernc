@@ -1,0 +1,15 @@
+# Go build and test output
+/bin/
+*.test
+*.out
+coverage.out
+
+# Local SQLite databases
+*.db
+*.db-shm
+*.db-wal
+
+# Editor and OS files
+.DS_Store
+.idea/
+.vscode/
