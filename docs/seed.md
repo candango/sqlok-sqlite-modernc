@@ -7,40 +7,57 @@ Build the pure-Go SQLite adapter for `github.com/candango/sqlok` using
 `sqlok` core and from the CGO-based `sqlok-sqlite-mattn` adapter.
 
 The deployment default is `CGO_ENABLED=0`. The adapter owns the pinned driver,
-SQLite connection/bootstrap details, SQLite dialect configuration, and the
+SQLite connection/bootstrap details, SQLite placeholder behavior, and the
 real-database E2E suite.
 
 ## Current decisions
 
 - Module: `github.com/candango/sqlok-sqlite-modernc`.
-- Driver: `modernc.org/sqlite`.
-- Initial pin: `v1.59.0`.
+- Driver: `modernc.org/sqlite` v1.59.0.
 - Initial Go baseline: Go 1.25.
 - CI matrix: Go 1.25, 1.26, and 1.27.
 - Build model: pure Go; validate every matrix entry with `CGO_ENABLED=0`.
+- Core dependency: `github.com/candango/sqlok` at the published pseudo-version
+  for commit `18e5570`, which provides numeric generated-key propagation.
 - Core boundary: use the public `github.com/candango/sqlok` API; do not copy
   compiler, mapper, session, or execution internals into this repository.
 - SQLite adapters remain separate so an application selects exactly one driver
   registration.
+- Public entry point: `sqlite.Open(dataSourceName string) (*sql.DB, error)`.
+- The caller owns `*sql.DB` lifetime and transactions. The adapter never begins,
+  commits, or rolls back a transaction.
+- SQLite uses the core question-mark placeholder dialect; no adapter-specific
+  dialect hook is required for this first slice.
 
 ## First implementation slice
 
 1. Add the smallest public adapter entry point for opening/configuring SQLite.
-2. Define the SQLite dialect behavior required by the core API, including
-   placeholder rendering where the core contract requires it.
+2. Validate `Open`, `Ping`, schema setup, SQL operations, and caller-owned
+   transaction behavior against a real SQLite database.
 3. Add real-database E2E tests for:
-   - schema setup and cleanup;
+   - deterministic schema setup and cleanup;
    - Mapper scanning and value extraction;
-   - `LoadContext` and Identity Map reuse;
+   - `LoadContext` and Identity Map pointer reuse;
    - `Flush` inside an application-owned transaction;
    - commit and rollback behavior;
-   - generated keys;
+   - one numeric generated primary key;
    - simple and composite primary keys where SQLite supports the case;
-   - missing rows and actionable mapping/database errors.
-4. Add a reproducible benchmark for representative Load and Flush paths. Keep
-   adapter cost separate from application-level query fan-out.
-5. Document supported Go, SQLite, and driver versions plus the exact commands
-   used for tests and benchmarks.
+   - question-mark placeholders;
+   - missing rows;
+   - actionable mapping and database errors.
+4. Validate Go 1.25, 1.26, and 1.27 with `CGO_ENABLED=0`.
+5. Document supported versions, DSNs, ownership, fixtures, transaction
+   behavior, and exact commands used for tests.
+
+## Generated-key contract
+
+The core's published contract uses `sql.Result.LastInsertId` for a pending
+insert with exactly one numeric primary-key field. It assigns the generated
+value to the entity and registers the entity in the Identity Map. Unsupported
+shapes or unavailable driver results return `sqlok.ErrGeneratedKeyUnsupported`.
+
+The adapter does not access core internals and does not hide transaction
+ownership.
 
 ## Explicit non-goals
 
@@ -51,7 +68,7 @@ real-database E2E suite.
 - Do not optimize based on a single microbenchmark; profile or measure the
   complete path first.
 
-## Suggested shape after the first slice
+## Suggested shape
 
 ```text
 .
@@ -60,22 +77,21 @@ real-database E2E suite.
 ├── go.mod
 ├── docs/
 │   └── seed.md
-├── adapter.go              # small public connection/driver boundary
-├── adapter_test.go         # unit-level adapter behavior
+├── adapter.go
+├── adapter_test.go
 └── integration/
-    └── sqlite_test.go      # real SQLite E2E contract
+    └── sqlite_test.go
 ```
-
-The exact package and file names are still open. Keep the design concrete until
-there are multiple real consumers that justify an abstraction.
 
 ## Completion evidence
 
-Before closing the initial issue, show:
+Before closing the initial implementation tickets, show:
 
+- the core dependency resolves from the published module proxy and is not a
+  local workspace replacement;
 - CI green on Go 1.25, 1.26, and 1.27 with `CGO_ENABLED=0`;
 - `CGO_ENABLED=0 go test ./...` and `CGO_ENABLED=0 go vet ./...` output;
-- the driver and Go versions used;
-- the E2E schema/fixture and transaction cases covered;
-- benchmark method and results, if a performance claim is made;
-- documentation updated with any support or behavior decision.
+- the driver, core, Go, and SQLite fixture versions;
+- the E2E schema and transaction cases covered;
+- documentation updated with API, DSN, ownership, and behavior decisions;
+- benchmark method and results if a performance claim is made.
