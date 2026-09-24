@@ -20,6 +20,10 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go-version }}
+      - name: Verify toolchain and pure-Go mode
+        run: |
+          go version
+          test "$(go env CGO_ENABLED)" = "0"
       - name: Download dependencies
         run: go mod download
       - name: Run unit and integration tests
