@@ -18,8 +18,9 @@ real-database E2E suite.
 - CI matrix: Go 1.25, 1.26, and 1.27.
 - Build model: pure Go; validate every matrix entry with `CGO_ENABLED=0`.
 - Core dependency: `github.com/candango/sqlok` at the published pseudo-version
-  `v0.0.2-0.20260926235555-a8e4f36001c7`, which includes the typed Select API
-  from commit `1507fdc` and numeric generated-key propagation from `18e5570`.
+  `v0.0.2-0.20260927042422-4df6c675add3`, which includes projection results
+  from commit `4df6c67`, typed predicates from `0b57c4e`, typed Select from
+  `1507fdc`, and numeric generated-key propagation from `18e5570`.
 - Core boundary: use the public `github.com/candango/sqlok` API; do not copy
   compiler, mapper, session, or execution internals into this repository.
 - SQLite adapters remain separate so an application selects exactly one driver
@@ -38,8 +39,11 @@ real-database E2E suite.
 3. Add real-database E2E tests for:
    - deterministic schema setup and cleanup;
    - Mapper scanning and value extraction;
+   - mapped projections with requested column order and `SelectRow` accessors;
+   - scalar projections with multiple rows and the single-column guard;
    - typed `Select(...).Where(...).OneOrNone(...)` reads and Identity Map
      pointer reuse;
+   - `IsNull`, `IsNotNull`, and parameterized inequality criteria;
    - `Flush` inside an application-owned transaction;
    - commit and rollback behavior;
    - one numeric generated primary key;
@@ -53,8 +57,11 @@ real-database E2E suite.
 
 ## Generated-key contract
 
-The core's published SELECT API uses typed `Select` queries with `Eq`
-criteria and `OneOrNone`, returning `(nil, nil)` when there is no match.
+The core's published SELECT API uses typed `Select` queries with mapped
+projections, scalar projections, `Eq`/comparison criteria, `IsNull`,
+`IsNotNull`, and `OneOrNone`, returning `(nil, nil)` when there is no match.
+`SelectRow.Columns`, `Values`, and `Value` preserve projection order and
+lookup behavior.
 
 The core's published generated-key contract uses `sql.Result.LastInsertId`
 for a pending insert with exactly one numeric primary-key field. It assigns

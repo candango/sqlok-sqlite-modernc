@@ -5,12 +5,15 @@ Pure-Go SQLite adapter for [`github.com/candango/sqlok`](https://github.com/cand
 ## Status
 
 The adapter entry point and real SQLite E2E contract are implemented locally.
-The adapter consumes the published `sqlok` generated-key contract from core
-commit `18e5570` through this module version:
+The adapter consumes the published SQLok projection and generated-key
+contracts through this module version:
 
 ```text
-github.com/candango/sqlok v0.0.2-0.20260926235555-a8e4f36001c7
+github.com/candango/sqlok v0.0.2-0.20260927042422-4df6c675add3
 ```
+
+This version includes the projection API from core commit `4df6c67` and the
+predicate API from `0b57c4e`.
 
 ## Public API
 
@@ -60,7 +63,7 @@ schema explicitly, and removes it through `testing.T.TempDir` cleanup.
 | Go | 1.25, 1.26, 1.27 |
 | CGO | `CGO_ENABLED=0` |
 | Driver | `modernc.org/sqlite` v1.59.0 |
-| Core | `github.com/candango/sqlok` pseudo-version at commit `18e5570` |
+| Core | `github.com/candango/sqlok` pseudo-version at commit `4df6c67` |
 | SQLite fixture | Temporary file database with `users`, `pairs`, and `invalid_users` tables |
 
 Generated-key support follows the core contract: one numeric generated primary
@@ -79,8 +82,10 @@ CGO_ENABLED=0 go vet ./...
 
 The GitHub Actions matrix repeats these checks on Go 1.25, 1.26, and 1.27.
 
-The E2E suite covers Mapper scanning and value extraction, typed
-`Select(...).Where(...).OneOrNone(...)` reads, Identity Map pointer reuse,
+The E2E suite covers Mapper scanning and value extraction, mapped projections
+with requested column order and row accessors, scalar projections and their
+cardinality guard, typed `Select(...).Where(...).OneOrNone(...)` reads,
+Identity Map pointer reuse, `IsNull`, `IsNotNull`, parameterized inequality,
 caller-owned `Flush`, commit, rollback, generated keys, simple and composite
 primary keys, question-mark placeholders, missing rows, and actionable
 database/mapping errors.

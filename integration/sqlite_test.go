@@ -41,6 +41,13 @@ type missingUser struct {
 
 func (*missingUser) TableName() string { return "missing_users" }
 
+type nullableUser struct {
+	ID   int     `sqlok:"column=id,pk"`
+	Name *string `sqlok:"column=name"`
+}
+
+func (*nullableUser) TableName() string { return "nullable_users" }
+
 func openDatabase(t *testing.T) *sql.DB {
 	t.Helper()
 
@@ -67,6 +74,10 @@ func openDatabase(t *testing.T) *sql.DB {
 		CREATE TABLE invalid_users (
 			id TEXT PRIMARY KEY,
 			name TEXT NOT NULL
+		);
+		CREATE TABLE nullable_users (
+			id INTEGER PRIMARY KEY,
+			name TEXT
 		);`)
 	require.NoError(t, err)
 	return db
@@ -99,6 +110,90 @@ func TestSQLiteMapperScansAndExtractsValues(t *testing.T) {
 		{Column: "id", Value: entity.ID, Primary: true},
 		{Column: "name", Value: "Ana"},
 	}, values)
+}
+
+func TestSQLiteSelectMappedProjection(t *testing.T) {
+	db := openDatabase(t)
+	ctx := context.Background()
+	_, err := db.ExecContext(ctx, "INSERT INTO users (name) VALUES (?)", "Ana")
+	require.NoError(t, err)
+
+	var id int64
+	require.NoError(t, db.QueryRowContext(
+		ctx,
+		"SELECT id FROM users WHERE name = ?",
+		"Ana",
+	).Scan(&id))
+
+	rows, err := sqlok.Select(user{}).
+		Where(sqlok.Eq("id", id)).
+		Columns("id", "name").
+		All(ctx, sqlok.NewSession(db))
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+
+	assert.Equal(t, []string{"id", "name"}, rows[0].Columns())
+	assert.Equal(t, []any{id, "Ana"}, rows[0].Values())
+	value, ok := rows[0].Value("id")
+	assert.True(t, ok)
+	assert.Equal(t, id, value)
+	value, ok = rows[0].Value("name")
+	assert.True(t, ok)
+	assert.Equal(t, "Ana", value)
+	_, ok = rows[0].Value("missing")
+	assert.False(t, ok)
+}
+
+func TestSQLiteSelectScalars(t *testing.T) {
+	db := openDatabase(t)
+	ctx := context.Background()
+	_, err := db.ExecContext(ctx, "INSERT INTO users (name) VALUES (?), (?)", "Ana", "Bia")
+	require.NoError(t, err)
+
+	values, err := sqlok.Select(user{}).
+		Columns("name").
+		Scalars(ctx, sqlok.NewSession(db))
+	require.NoError(t, err)
+	assert.Equal(t, []any{"Ana", "Bia"}, values)
+
+	_, err = sqlok.Select(user{}).
+		Columns("id", "name").
+		Scalars(ctx, sqlok.NewSession(db))
+	assert.ErrorIs(t, err, sqlok.ErrScalarSelectProjection)
+}
+
+func TestSQLiteSelectPredicates(t *testing.T) {
+	db := openDatabase(t)
+	ctx := context.Background()
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO nullable_users (id, name) VALUES
+			(1, NULL),
+			(2, 'Ana'),
+			(3, 'Bia')`)
+	require.NoError(t, err)
+
+	nullRows, err := sqlok.Select(nullableUser{}).
+		Where(sqlok.IsNull("name")).
+		All(ctx, sqlok.NewSession(db))
+	require.NoError(t, err)
+	require.Len(t, nullRows, 1)
+	assert.Equal(t, 1, nullRows[0].ID)
+	assert.Nil(t, nullRows[0].Name)
+
+	notNullRows, err := sqlok.Select(nullableUser{}).
+		Where(sqlok.IsNotNull("name")).
+		All(ctx, sqlok.NewSession(db))
+	require.NoError(t, err)
+	require.Len(t, notNullRows, 2)
+	assert.Equal(t, "Ana", *notNullRows[0].Name)
+	assert.Equal(t, "Bia", *notNullRows[1].Name)
+
+	greaterRows, err := sqlok.Select(nullableUser{}).
+		Where(sqlok.Gt("id", 1)).
+		All(ctx, sqlok.NewSession(db))
+	require.NoError(t, err)
+	require.Len(t, greaterRows, 2)
+	assert.Equal(t, []int{2, 3}, []int{greaterRows[0].ID, greaterRows[1].ID})
 }
 
 func TestSQLiteAdapterFlushSelectAndGeneratedKey(t *testing.T) {
