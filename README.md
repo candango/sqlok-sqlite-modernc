@@ -9,11 +9,12 @@ The adapter consumes the published SQLok projection and generated-key
 contracts through this module version:
 
 ```text
-github.com/candango/sqlok v0.0.2-0.20260927042422-4df6c675add3
+github.com/candango/sqlok v0.0.2-0.20260927050737-c966d6354a3c
 ```
 
-This version includes the projection API from core commit `4df6c67` and the
-predicate API from `0b57c4e`.
+This version includes the projection API from core commit `4df6c67`, the
+predicate API from `0b57c4e`, and transaction-bound reads/autoflush from
+`c966d63`.
 
 ## Public API
 
@@ -50,6 +51,10 @@ func main() {
 The caller owns the returned `*sql.DB` lifetime and every transaction. The
 adapter never begins, commits, or rolls back a transaction. `Flush` receives a
 caller-owned `*sql.Tx`, and the caller decides whether to commit or roll back.
+A caller can bind a transaction with `Session.BindTransaction(tx)`; subsequent
+SELECTs use that transaction and autoflush pending INSERTs or dirty UPDATEs.
+`Session.UnbindTransaction()` only removes the binding and never commits or
+rolls back.
 
 SQLite uses question-mark placeholders. Use a file DSN for persistent data or a
 unique `file:<name>?mode=memory&cache=shared` DSN for an isolated in-memory
@@ -63,7 +68,7 @@ schema explicitly, and removes it through `testing.T.TempDir` cleanup.
 | Go | 1.25, 1.26, 1.27 |
 | CGO | `CGO_ENABLED=0` |
 | Driver | `modernc.org/sqlite` v1.59.0 |
-| Core | `github.com/candango/sqlok` pseudo-version at commit `4df6c67` |
+| Core | `github.com/candango/sqlok` pseudo-version at commit `c966d63` |
 | SQLite fixture | Temporary file database with `users`, `pairs`, and `invalid_users` tables |
 
 Generated-key support follows the core contract: one numeric generated primary
@@ -86,9 +91,10 @@ The E2E suite covers Mapper scanning and value extraction, mapped projections
 with requested column order and row accessors, scalar projections and their
 cardinality guard, typed `Select(...).Where(...).OneOrNone(...)` reads,
 Identity Map pointer reuse, `IsNull`, `IsNotNull`, parameterized inequality,
-caller-owned `Flush`, commit, rollback, generated keys, simple and composite
-primary keys, question-mark placeholders, missing rows, and actionable
-database/mapping errors.
+caller-owned `Flush`, bound-read autoflush for pending INSERTs and dirty
+UPDATEs, commit, rollback, generated keys, simple and composite primary keys,
+question-mark placeholders, missing rows, and actionable database/mapping
+errors.
 
 No performance improvement is claimed without a reproducible benchmark.
 

@@ -234,6 +234,81 @@ func TestSQLiteAdapterFlushSelectAndGeneratedKey(t *testing.T) {
 	assert.Equal(t, "Bia", name)
 }
 
+func TestSQLiteBoundSelectAutoflushesPendingInsert(t *testing.T) {
+	db := openDatabase(t)
+	ctx := context.Background()
+	session := sqlok.NewSession(db)
+	entity := &user{Name: "Pending"}
+	require.NoError(t, session.Add(entity))
+
+	tx, err := db.BeginTx(ctx, nil)
+	require.NoError(t, err)
+	require.NoError(t, session.BindTransaction(tx))
+
+	selected, err := sqlok.Select(user{}).
+		Where(sqlok.Eq("name", "Pending")).
+		OneOrNone(ctx, session)
+	require.NoError(t, err)
+	assert.Same(t, entity, selected)
+	assert.NotZero(t, entity.ID)
+
+	var count int
+	require.NoError(t, tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM users").Scan(&count))
+	assert.Equal(t, 1, count)
+
+	session.UnbindTransaction()
+	require.NoError(t, tx.Commit())
+	require.NoError(t, db.QueryRowContext(
+		ctx,
+		"SELECT COUNT(*) FROM users WHERE id = ?",
+		entity.ID,
+	).Scan(&count))
+	assert.Equal(t, 1, count)
+}
+
+func TestSQLiteBoundSelectAutoflushesDirtyUpdate(t *testing.T) {
+	db := openDatabase(t)
+	ctx := context.Background()
+	_, err := db.ExecContext(ctx, "INSERT INTO users (name) VALUES (?)", "Ana")
+	require.NoError(t, err)
+
+	session := sqlok.NewSession(db)
+	entity, err := sqlok.Select(user{}).
+		Where(sqlok.Eq("name", "Ana")).
+		OneOrNone(ctx, session)
+	require.NoError(t, err)
+	require.NotNil(t, entity)
+	entity.Name = "Bia"
+
+	tx, err := db.BeginTx(ctx, nil)
+	require.NoError(t, err)
+	require.NoError(t, session.BindTransaction(tx))
+
+	selected, err := sqlok.Select(user{}).
+		Where(sqlok.Eq("id", entity.ID)).
+		OneOrNone(ctx, session)
+	require.NoError(t, err)
+	assert.Same(t, entity, selected)
+	assert.Equal(t, "Bia", selected.Name)
+
+	var name string
+	require.NoError(t, tx.QueryRowContext(
+		ctx,
+		"SELECT name FROM users WHERE id = ?",
+		entity.ID,
+	).Scan(&name))
+	assert.Equal(t, "Bia", name)
+
+	session.UnbindTransaction()
+	require.NoError(t, tx.Rollback())
+	require.NoError(t, db.QueryRowContext(
+		ctx,
+		"SELECT name FROM users WHERE id = ?",
+		entity.ID,
+	).Scan(&name))
+	assert.Equal(t, "Ana", name)
+}
+
 func TestSQLiteIdentityMapReusesLoadedPointer(t *testing.T) {
 	db := openDatabase(t)
 	ctx := context.Background()

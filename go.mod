@@ -3,7 +3,7 @@ module github.com/candango/sqlok-sqlite-modernc
 go 1.25.0
 
 require (
-	github.com/candango/sqlok v0.0.2-0.20260927042422-4df6c675add3
+	github.com/candango/sqlok v0.0.2-0.20260927050737-c966d6354a3c
 	github.com/stretchr/testify v1.11.1
 	modernc.org/sqlite v1.59.0
 )

@@ -1,5 +1,5 @@
-github.com/candango/sqlok v0.0.2-0.20260927042422-4df6c675add3 h1:UGSuuTPm0lzZ8Fez/2pNTcx97hA10Pi6g7zLRAPd8gM=
-github.com/candango/sqlok v0.0.2-0.20260927042422-4df6c675add3/go.mod h1:wiqcx9Kopp1SnWZXORzmZ3za+AR9YpoGrh+DqpqHEx4=
+github.com/candango/sqlok v0.0.2-0.20260927050737-c966d6354a3c h1:NFtWOIOPaMoUDtUWCOH2gxRU2M3YKjwomQPZdHg9IFs=
+github.com/candango/sqlok v0.0.2-0.20260927050737-c966d6354a3c/go.mod h1:wiqcx9Kopp1SnWZXORzmZ3za+AR9YpoGrh+DqpqHEx4=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=

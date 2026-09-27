@@ -18,9 +18,10 @@ real-database E2E suite.
 - CI matrix: Go 1.25, 1.26, and 1.27.
 - Build model: pure Go; validate every matrix entry with `CGO_ENABLED=0`.
 - Core dependency: `github.com/candango/sqlok` at the published pseudo-version
-  `v0.0.2-0.20260927042422-4df6c675add3`, which includes projection results
+  `v0.0.2-0.20260927050737-c966d6354a3c`, which includes projection results
   from commit `4df6c67`, typed predicates from `0b57c4e`, typed Select from
-  `1507fdc`, and numeric generated-key propagation from `18e5570`.
+  `1507fdc`, transaction-bound reads/autoflush from `c966d63`, and numeric
+  generated-key propagation from `18e5570`.
 - Core boundary: use the public `github.com/candango/sqlok` API; do not copy
   compiler, mapper, session, or execution internals into this repository.
 - SQLite adapters remain separate so an application selects exactly one driver
@@ -28,6 +29,8 @@ real-database E2E suite.
 - Public entry point: `sqlite.Open(dataSourceName string) (*sql.DB, error)`.
 - The caller owns `*sql.DB` lifetime and transactions. The adapter never begins,
   commits, or rolls back a transaction.
+- `Session.BindTransaction(tx)` keeps reads and autoflush on a caller-owned
+  transaction; `UnbindTransaction` only removes the binding.
 - SQLite uses the core question-mark placeholder dialect; no adapter-specific
   dialect hook is required for this first slice.
 
@@ -44,6 +47,7 @@ real-database E2E suite.
    - typed `Select(...).Where(...).OneOrNone(...)` reads and Identity Map
      pointer reuse;
    - `IsNull`, `IsNotNull`, and parameterized inequality criteria;
+   - transaction-bound reads with pending INSERT and dirty UPDATE autoflush;
    - `Flush` inside an application-owned transaction;
    - commit and rollback behavior;
    - one numeric generated primary key;
@@ -61,7 +65,8 @@ The core's published SELECT API uses typed `Select` queries with mapped
 projections, scalar projections, `Eq`/comparison criteria, `IsNull`,
 `IsNotNull`, and `OneOrNone`, returning `(nil, nil)` when there is no match.
 `SelectRow.Columns`, `Values`, and `Value` preserve projection order and
-lookup behavior.
+lookup behavior. Bound SELECTs use `Session.BindTransaction(tx)` and autoflush
+pending INSERTs or dirty UPDATEs before querying.
 
 The core's published generated-key contract uses `sql.Result.LastInsertId`
 for a pending insert with exactly one numeric primary-key field. It assigns
