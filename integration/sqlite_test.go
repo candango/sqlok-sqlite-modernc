@@ -101,7 +101,7 @@ func TestSQLiteMapperScansAndExtractsValues(t *testing.T) {
 	}, values)
 }
 
-func TestSQLiteAdapterFlushLoadAndGeneratedKey(t *testing.T) {
+func TestSQLiteAdapterFlushSelectAndGeneratedKey(t *testing.T) {
 	db := openDatabase(t)
 	ctx := context.Background()
 	session := sqlok.NewSession(db)
@@ -118,7 +118,9 @@ func TestSQLiteAdapterFlushLoadAndGeneratedKey(t *testing.T) {
 	require.NoError(t, tx.Commit())
 
 	assert.NotZero(t, entity.ID)
-	loaded, err := sqlok.LoadContext[user](ctx, session, entity.ID)
+	loaded, err := sqlok.Select(user{}).
+		Where(sqlok.Eq("id", entity.ID)).
+		OneOrNone(ctx, session)
 	require.NoError(t, err)
 	assert.Same(t, entity, loaded)
 
@@ -147,13 +149,17 @@ func TestSQLiteIdentityMapReusesLoadedPointer(t *testing.T) {
 	require.NoError(t, db.QueryRowContext(ctx, "SELECT id FROM users WHERE name = ?", "Ana").Scan(&id))
 
 	session := sqlok.NewSession(db)
-	first, err := sqlok.LoadContext[user](ctx, session, id)
+	first, err := sqlok.Select(user{}).
+		Where(sqlok.Eq("id", id)).
+		OneOrNone(ctx, session)
 	require.NoError(t, err)
 	require.NotNil(t, first)
 
 	_, err = db.ExecContext(ctx, "UPDATE users SET name = ? WHERE id = ?", "Bia", id)
 	require.NoError(t, err)
-	second, err := sqlok.LoadContext[user](ctx, session, id)
+	second, err := sqlok.Select(user{}).
+		Where(sqlok.Eq("id", id)).
+		OneOrNone(ctx, session)
 	require.NoError(t, err)
 
 	assert.Same(t, first, second)
@@ -182,7 +188,7 @@ func TestSQLiteAdapterRollbackKeepsDatabaseUnchanged(t *testing.T) {
 	assert.Zero(t, count)
 }
 
-func TestSQLiteAdapterLoadsCompositeKeyAndMissingRows(t *testing.T) {
+func TestSQLiteAdapterSelectsCompositeKeyAndMissingRows(t *testing.T) {
 	db := openDatabase(t)
 	ctx := context.Background()
 	_, err := db.ExecContext(
@@ -195,16 +201,31 @@ func TestSQLiteAdapterLoadsCompositeKeyAndMissingRows(t *testing.T) {
 	require.NoError(t, err)
 
 	session := sqlok.NewSession(db)
-	first, err := sqlok.LoadContext[pair](ctx, session, sqlok.CompositeKey{7, 11})
+	first, err := sqlok.Select(pair{}).
+		Where(
+			sqlok.Eq("tenant_id", 7),
+			sqlok.Eq("user_id", 11),
+		).
+		OneOrNone(ctx, session)
 	require.NoError(t, err)
 	require.NotNil(t, first)
 	assert.Equal(t, &pair{TenantID: 7, UserID: 11, Name: "Ana"}, first)
 
-	second, err := sqlok.LoadContext[pair](ctx, session, sqlok.CompositeKey{7, 11})
+	second, err := sqlok.Select(pair{}).
+		Where(
+			sqlok.Eq("tenant_id", 7),
+			sqlok.Eq("user_id", 11),
+		).
+		OneOrNone(ctx, session)
 	require.NoError(t, err)
 	assert.Same(t, first, second)
 
-	missing, err := sqlok.LoadContext[pair](ctx, session, sqlok.CompositeKey{7, 12})
+	missing, err := sqlok.Select(pair{}).
+		Where(
+			sqlok.Eq("tenant_id", 7),
+			sqlok.Eq("user_id", 12),
+		).
+		OneOrNone(ctx, session)
 	require.NoError(t, err)
 	assert.Nil(t, missing)
 }
@@ -214,10 +235,12 @@ func TestSQLiteAdapterReportsActionableErrors(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("missing table", func(t *testing.T) {
-		loaded, err := sqlok.LoadContext[missingUser](ctx, sqlok.NewSession(db), 1)
+		loaded, err := sqlok.Select(missingUser{}).
+			Where(sqlok.Eq("id", 1)).
+			OneOrNone(ctx, sqlok.NewSession(db))
 		require.Error(t, err)
 		assert.Nil(t, loaded)
-		assert.Contains(t, err.Error(), "query session load")
+		assert.Contains(t, err.Error(), "query selected entities")
 		assert.Contains(t, err.Error(), "missing_users")
 	})
 
@@ -230,10 +253,12 @@ func TestSQLiteAdapterReportsActionableErrors(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		loaded, err := sqlok.LoadContext[invalidUser](ctx, sqlok.NewSession(db), "not-an-int")
+		loaded, err := sqlok.Select(invalidUser{}).
+			Where(sqlok.Eq("id", "not-an-int")).
+			OneOrNone(ctx, sqlok.NewSession(db))
 		require.Error(t, err)
 		assert.Nil(t, loaded)
-		assert.Contains(t, err.Error(), "map session load row")
+		assert.Contains(t, err.Error(), "map selected entity")
 		assert.Contains(t, err.Error(), "id")
 	})
 }

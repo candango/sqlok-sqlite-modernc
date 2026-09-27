@@ -9,7 +9,7 @@ The adapter consumes the published `sqlok` generated-key contract from core
 commit `18e5570` through this module version:
 
 ```text
-github.com/candango/sqlok v0.0.0-20260924024447-18e5570f637c
+github.com/candango/sqlok v0.0.2-0.20260926235555-a8e4f36001c7
 ```
 
 ## Public API
@@ -79,10 +79,11 @@ CGO_ENABLED=0 go vet ./...
 
 The GitHub Actions matrix repeats these checks on Go 1.25, 1.26, and 1.27.
 
-The E2E suite covers Mapper scanning and value extraction, `LoadContext`,
-Identity Map pointer reuse, caller-owned `Flush`, commit, rollback, generated
-keys, simple and composite primary keys, question-mark placeholders, missing
-rows, and actionable database/mapping errors.
+The E2E suite covers Mapper scanning and value extraction, typed
+`Select(...).Where(...).OneOrNone(...)` reads, Identity Map pointer reuse,
+caller-owned `Flush`, commit, rollback, generated keys, simple and composite
+primary keys, question-mark placeholders, missing rows, and actionable
+database/mapping errors.
 
 No performance improvement is claimed without a reproducible benchmark.
 
